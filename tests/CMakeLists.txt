@@ -23,13 +23,16 @@ add_executable(
     cwm-unit-tests
 
     unit/smoke_test.cpp
+	unit/win32_handle_tests.cpp
 )
 
 target_link_libraries(
     cwm-unit-tests
     PRIVATE
+		cwm-platform
         cwm-iocp
         GTest::gtest_main
+		cwm-compiler-options
 )
 
 target_link_libraries(

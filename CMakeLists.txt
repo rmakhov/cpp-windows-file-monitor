@@ -51,6 +51,28 @@ INTERFACE
 endif()
 
 # ---------------------------------------------------------------------------
+# Platform library
+# ---------------------------------------------------------------------------
+
+add_library(
+    cwm-platform
+    STATIC
+        src/platform/win32_handle.cpp
+)
+
+target_link_libraries(
+    cwm-platform
+    PUBLIC
+        cwm-compiler-options
+)
+
+target_include_directories(
+    cwm-platform
+    PUBLIC
+        ${PROJECT_SOURCE_DIR}/include
+)
+
+# ---------------------------------------------------------------------------
 # IOCP library
 # ---------------------------------------------------------------------------
 
@@ -71,6 +93,7 @@ add_library(
 target_link_libraries(
 	cwm-iocp
 	PUBLIC
+		cwm-platform
 		cwm-compiler-options
 )
 
