@@ -88,6 +88,7 @@ add_library(
     cwm-iocp
     STATIC
         src/iocp/iocp.cpp
+        src/iocp/iocp_context.cpp
 )
 
 target_link_libraries(
