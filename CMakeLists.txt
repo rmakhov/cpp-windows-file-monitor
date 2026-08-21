@@ -89,6 +89,7 @@ add_library(
     STATIC
         src/iocp/iocp.cpp
         src/iocp/iocp_context.cpp
+        src/iocp/iocp_operation.cpp
 )
 
 target_link_libraries(

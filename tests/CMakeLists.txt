@@ -25,6 +25,7 @@ add_executable(
     unit/smoke_test.cpp
 	unit/win32_handle_tests.cpp
 	unit/iocp_context_tests.cpp
+	unit/iocp_operation_tests.cpp
 )
 
 target_link_libraries(
