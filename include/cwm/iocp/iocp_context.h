@@ -2,8 +2,11 @@
 
 #include <Windows.h>
 
+#include <chrono>
 #include <cstdint>
+#include <optional>
 
+#include <cwm/iocp/iocp_completion.h>
 #include <cwm/platform/win32_handle.h>
 
 namespace cwm::iocp
@@ -31,6 +34,9 @@ public:
         DWORD bytes_transferred,
         ULONG_PTR completion_key,
         OVERLAPPED* overlapped);
+
+	[[nodiscard]]
+	std::optional<IocpCompletion> wait(std::chrono::milliseconds timeout);
 
     [[nodiscard]]
     HANDLE native_handle() const noexcept;

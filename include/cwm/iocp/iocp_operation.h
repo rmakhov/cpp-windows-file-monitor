@@ -5,8 +5,12 @@
 namespace cwm::iocp
 {
 
+class IocpContext;
+
 class IocpOperation final
 {
+    friend class IocpContext;
+
 public:
     IocpOperation() noexcept = default;
 
