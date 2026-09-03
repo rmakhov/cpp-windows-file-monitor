@@ -26,6 +26,7 @@ add_executable(
 	unit/win32_handle_tests.cpp
 	unit/iocp_context_tests.cpp
 	unit/iocp_operation_tests.cpp
+	unit/bounded_queue_tests.cpp
 	integration/iocp_read_file_tests.cpp
 )
 
