@@ -126,6 +126,7 @@ add_library(
     cwm-filesystem
     STATIC
         src/filesystem/filesystem.cpp
+		src/filesystem/directory_watcher.cpp
 )
 
 target_link_libraries(

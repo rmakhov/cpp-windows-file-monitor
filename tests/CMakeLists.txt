@@ -29,6 +29,7 @@ add_executable(
 	unit/bounded_queue_tests.cpp
 	unit/file_system_event_tests.cpp
 	integration/iocp_read_file_tests.cpp
+	integration/directory_watcher_tests.cpp
 )
 
 target_link_libraries(
@@ -36,6 +37,7 @@ target_link_libraries(
     PRIVATE
 		cwm-platform
         cwm-iocp
+		cwm-filesystem
         GTest::gtest_main
 		cwm-compiler-options
 )

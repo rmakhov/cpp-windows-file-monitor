@@ -5,7 +5,6 @@
 #include <deque>
 #include <mutex>
 #include <optional>
-#include <stop_token>
 #include <stdexcept>
 #include <utility>
 
@@ -41,7 +40,20 @@ public:
 
     ~BoundedQueue() = default;
 
-    QueuePushResult try_push(T value)
+    /*
+     * Attempts to enqueue value without blocking.
+     *
+     * Accepted:
+     *     The queue takes ownership of value by moving it.
+     *
+     * Full:
+     *     value remains unchanged and ownership stays with the caller.
+     *
+     * Closed:
+     *     value remains unchanged and ownership stays with the caller.
+     */
+    [[nodiscard]]
+    QueuePushResult try_push(T& value)
     {
         {
             std::lock_guard lock(mutex_);
@@ -69,17 +81,32 @@ public:
         return QueuePushResult::Accepted;
     }
 
-    std::optional<T> wait_pop(std::stop_token stop_token)
+    /*
+     * Waits until:
+     *   - an item is available,
+     *   - the queue is closed, or
+     *   - stop_token is requested.
+     *
+     * Returns std::nullopt when the wait is cancelled or when
+     * the queue is closed and contains no remaining items.
+     *
+     * Already queued items are always drained before returning
+     * std::nullopt because of close().
+     */
+    [[nodiscard]]
+    std::optional<T> wait_pop(
+        std::stop_token stop_token)
     {
         std::unique_lock lock(mutex_);
 
-        const bool ready = condition_.wait(
-            lock,
-            stop_token,
-            [this]
-            {
-                return closed_ || !queue_.empty();
-            });
+        const bool ready =
+            condition_.wait(
+                lock,
+                stop_token,
+                [this]
+                {
+                    return closed_ || !queue_.empty();
+                });
 
         if (!ready)
         {
@@ -88,16 +115,24 @@ public:
 
         if (queue_.empty())
         {
-            // Queue is closed and all queued items have been consumed.
+            // Queue is closed and all queued items
+            // have already been consumed.
             return std::nullopt;
         }
 
         T value = std::move(queue_.front());
+
         queue_.pop_front();
 
         return value;
     }
 
+    /*
+     * Prevents future pushes and wakes all waiting consumers.
+     *
+     * Items already in the queue remain available and can
+     * still be consumed.
+     */
     void close()
     {
         {
@@ -143,6 +178,7 @@ public:
 
 private:
     mutable std::mutex mutex_;
+
     std::condition_variable_any condition_;
 
     std::deque<T> queue_;

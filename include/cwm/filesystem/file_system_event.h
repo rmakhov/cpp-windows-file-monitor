@@ -1,5 +1,6 @@
 #pragma once
 
+#include <chrono>
 #include <filesystem>
 
 namespace cwm::filesystem
@@ -18,6 +19,7 @@ struct FileSystemEvent
 {
     std::filesystem::path path;
     FileSystemEventAction action;
+    std::chrono::steady_clock::time_point timestamp;
 };
 
 } // namespace cwm::filesystem
