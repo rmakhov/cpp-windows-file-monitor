@@ -30,6 +30,7 @@ add_executable(
 	unit/file_system_event_tests.cpp
 	integration/iocp_read_file_tests.cpp
 	integration/directory_watcher_tests.cpp
+	integration/watch_manager_tests.cpp
 )
 
 target_link_libraries(

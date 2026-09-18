@@ -127,6 +127,7 @@ add_library(
     STATIC
         src/filesystem/filesystem.cpp
 		src/filesystem/directory_watcher.cpp
+		src/filesystem/watch_manager.cpp
 )
 
 target_link_libraries(
