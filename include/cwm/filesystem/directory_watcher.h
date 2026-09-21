@@ -10,12 +10,15 @@
 #include <cstddef>
 #include <deque>
 #include <filesystem>
+#include <functional>
 #include <vector>
 
 #include <Windows.h>
 
 namespace cwm::filesystem
 {
+	
+using EventAcceptedCallback = std::function<void(const FileSystemEvent&)>;
 
 struct DirectoryWatcherConfig
 {
@@ -24,6 +27,8 @@ struct DirectoryWatcherConfig
     // Identifies this watcher when completions are retrieved
     // from the shared IOCP.
     ULONG_PTR completion_key{};
+	
+	EventAcceptedCallback event_accepted_callback;
 
     // Buffer used by ReadDirectoryChangesW.
     std::size_t notification_buffer_size = 64 * 1024;
@@ -105,8 +110,9 @@ private:
 
     void handle_read_error(
         DWORD error);
+		
+	void notify_event_accepted(const FileSystemEvent& event);
 
-private:
     iocp::IocpContext& iocp_;
 
     concurrency::BoundedQueue<FileSystemEvent>& event_queue_;

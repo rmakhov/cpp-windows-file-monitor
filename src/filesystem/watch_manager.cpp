@@ -119,6 +119,36 @@ void WatchManager::add_watcher(
     DirectoryWatcherConfig config;
     config.directory = directory;
     config.completion_key = completion_key;
+	
+	config.event_accepted_callback =
+    [this](const FileSystemEvent& event)
+    {
+        if (event.action != FileSystemEventAction::Added)
+        {
+            return;
+        }
+
+        std::error_code error;
+
+        if (!std::filesystem::is_directory(
+                event.path,
+                error))
+        {
+            return;
+        }
+
+        if (error)
+        {
+            return;
+        }
+
+        if (watchers_.contains(event.path))
+        {
+            return;
+        }
+
+        add_watcher(event.path);
+    };
 
     auto watcher = std::make_unique<DirectoryWatcher>(
         iocp_,

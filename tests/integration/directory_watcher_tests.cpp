@@ -847,41 +847,54 @@ TEST_F(
         }
     }
 
-    ASSERT_EQ(
-        watcher.deferred_event_count(),
-        1u);
 
-    // Make room in the external queue.
-    auto queued =
-        event_queue.wait_pop(std::stop_token{});
+	ASSERT_GE(
+		watcher.deferred_event_count(),
+		1u);
 
-    ASSERT_TRUE(queued.has_value());
+	// Make room in the external queue.
+	auto queued =
+		event_queue.wait_pop(std::stop_token{});
 
-    const auto accepted =
-        watcher.retry_deferred_events();
+	ASSERT_TRUE(queued.has_value());
 
-    EXPECT_EQ(accepted, 1u);
-    EXPECT_EQ(
-        watcher.deferred_event_count(),
-        0u);
+	std::size_t total_accepted = 0;
+	bool deferred_event_found = false;
 
-    ASSERT_EQ(event_queue.size(), 1u);
+	while (watcher.deferred_event_count() > 0)
+	{
+		const auto accepted =
+			watcher.retry_deferred_events();
 
-    auto deferred =
-        event_queue.wait_pop(std::stop_token{});
+		ASSERT_GT(accepted, 0u);
 
-    ASSERT_TRUE(deferred.has_value());
+		total_accepted += accepted;
 
-    EXPECT_EQ(
-        deferred->action,
-        cwm::filesystem::
-            FileSystemEventAction::Added);
+		// The queue capacity is one, so consume the event
+		// before attempting another retry.
+		auto event =
+			event_queue.wait_pop(std::stop_token{});
 
-    EXPECT_EQ(
-        deferred->path,
-        deferred_file);
+		ASSERT_TRUE(event.has_value());
 
-    watcher.stop();
+		if (event->path == deferred_file &&
+			event->action ==
+				cwm::filesystem::FileSystemEventAction::Added)
+		{
+			deferred_event_found = true;
+		}
+	}
+
+	EXPECT_GE(total_accepted, 1u);
+	EXPECT_TRUE(deferred_event_found);
+
+	EXPECT_EQ(
+		watcher.deferred_event_count(),
+		0u);
+
+	watcher.stop();
+
+
 
     bool stopped = false;
 

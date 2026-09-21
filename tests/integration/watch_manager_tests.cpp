@@ -478,3 +478,60 @@ TEST_F(WatchManagerTest, AddDirectoryHandlesEmptyDirectory)
 
     stop_and_drain(manager, iocp);
 }
+
+
+TEST_F(WatchManagerTest, StartsWatcherForNewDirectory)
+{
+    cwm::iocp::IocpContext iocp;
+
+    cwm::concurrency::BoundedQueue<cwm::filesystem::FileSystemEvent>
+        event_queue(32);
+
+    cwm::filesystem::WatchManager manager(iocp, event_queue);
+
+    const auto root =
+        create_directory(test_root_, "root");
+
+    manager.add_directory(root);
+
+    ASSERT_EQ(manager.watcher_count(), 1u);
+
+    const auto new_directory =
+        root / "new_directory";
+
+    ASSERT_TRUE(
+        std::filesystem::create_directory(new_directory));
+
+    bool watcher_started = false;
+
+    const auto deadline =
+        std::chrono::steady_clock::now() +
+        std::chrono::seconds(5);
+
+    while (std::chrono::steady_clock::now() < deadline)
+    {
+        const auto completion =
+            iocp.wait(std::chrono::milliseconds(100));
+
+        if (!completion)
+        {
+            continue;
+        }
+
+        //manager.handle_completion(*completion);
+		if (!manager.handle_completion(*completion)) {
+			continue;
+		}
+
+        if (manager.watcher_count() == 2u)
+        {
+            watcher_started = true;
+            break;
+        }
+    }
+
+    EXPECT_TRUE(watcher_started);
+    EXPECT_EQ(manager.watcher_count(), 2u);
+
+    stop_and_drain(manager, iocp);
+}

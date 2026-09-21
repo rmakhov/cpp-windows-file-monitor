@@ -237,16 +237,24 @@ std::size_t DirectoryWatcher::retry_deferred_events()
 
     while (!deferred_events_.empty())
     {
-        FileSystemEvent& event = deferred_events_.front();
+        FileSystemEvent& event =
+            deferred_events_.front();
 
-        const auto result = event_queue_.try_push(event);
+        FileSystemEvent queue_event = event;
 
-        if (result != concurrency::QueuePushResult::Accepted)
+        const auto result =
+            event_queue_.try_push(queue_event);
+
+        if (result !=
+            concurrency::QueuePushResult::Accepted)
         {
             break;
         }
 
+        notify_event_accepted(event);
+
         deferred_events_.pop_front();
+
         ++accepted;
     }
 
@@ -431,10 +439,14 @@ void DirectoryWatcher::process_notifications(
 void DirectoryWatcher::handle_event(
     FileSystemEvent event)
 {
-    const auto result = event_queue_.try_push(event);
+    FileSystemEvent queue_event = event;
+
+    const auto result =
+        event_queue_.try_push(queue_event);
 
     if (result == concurrency::QueuePushResult::Accepted)
     {
+        notify_event_accepted(event);
         return;
     }
 
@@ -491,6 +503,15 @@ void DirectoryWatcher::handle_read_error(
 
     mark_reconciliation_required(
         ReconciliationReason::WatcherError);
+}
+
+void DirectoryWatcher::notify_event_accepted(
+    const FileSystemEvent& event)
+{
+    if (config_.event_accepted_callback)
+    {
+        config_.event_accepted_callback(event);
+    }
 }
 
 } // namespace cwm::filesystem
