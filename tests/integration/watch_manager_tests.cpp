@@ -410,3 +410,71 @@ TEST_F(WatchManagerTest, RemovingUnknownDirectoryDoesNothing)
 }
 
 } // namespace
+
+
+TEST_F(WatchManagerTest, AddDirectoryStartsWatchersForExistingSubdirectories)
+{
+    cwm::iocp::IocpContext iocp;
+
+    cwm::concurrency::BoundedQueue<cwm::filesystem::FileSystemEvent>
+        event_queue(32);
+
+    cwm::filesystem::WatchManager manager(iocp, event_queue);
+
+    const auto root =
+        create_directory(test_root_, "root");
+
+    create_directory(root, "directory_a");
+    create_directory(root, "directory_b");
+    create_directory(root, "directory_c");
+
+    manager.add_directory(root);
+
+    EXPECT_EQ(manager.watcher_count(), 4u);
+
+    stop_and_drain(manager, iocp);
+}
+
+TEST_F(WatchManagerTest, AddDirectoryIgnoresFiles)
+{
+    cwm::iocp::IocpContext iocp;
+
+    cwm::concurrency::BoundedQueue<cwm::filesystem::FileSystemEvent>
+        event_queue(16);
+
+    cwm::filesystem::WatchManager manager(iocp, event_queue);
+
+    const auto root =
+        create_directory(test_root_, "root");
+
+    create_directory(root, "subdirectory");
+
+    create_file(root / "file.txt");
+
+    create_file(root / "another_file.txt");
+
+    manager.add_directory(root);
+
+    EXPECT_EQ(manager.watcher_count(), 2u);
+
+    stop_and_drain(manager, iocp);
+}
+
+TEST_F(WatchManagerTest, AddDirectoryHandlesEmptyDirectory)
+{
+    cwm::iocp::IocpContext iocp;
+
+    cwm::concurrency::BoundedQueue<cwm::filesystem::FileSystemEvent>
+        event_queue(16);
+
+    cwm::filesystem::WatchManager manager(iocp, event_queue);
+
+    const auto root =
+        create_directory(test_root_, "root");
+
+    manager.add_directory(root);
+
+    EXPECT_EQ(manager.watcher_count(), 1u);
+
+    stop_and_drain(manager, iocp);
+}

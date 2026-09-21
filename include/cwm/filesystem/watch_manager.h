@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cwm/concurrency/bounded_queue.h>
+#include <cwm/filesystem/directory_discovery.h>
 #include <cwm/filesystem/directory_watcher.h>
 #include <cwm/filesystem/file_system_event.h>
 #include <cwm/iocp/iocp_completion.h>
@@ -34,6 +35,9 @@ public:
 
     void remove_directory(
         const std::filesystem::path& directory);
+		
+	void add_watcher(
+		const std::filesystem::path& directory);
 
     [[nodiscard]]
     bool handle_completion(
@@ -58,6 +62,7 @@ private:
     concurrency::BoundedQueue<FileSystemEvent>& event_queue_;
 
     WatcherMap watchers_;
+	DirectoryDiscovery discovery_;
 
     ULONG_PTR next_completion_key_{1};
 };

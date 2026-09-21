@@ -19,6 +19,7 @@ WatchManager::~WatchManager()
     stop();
 }
 
+/*
 void WatchManager::add_directory(
     const std::filesystem::path& directory)
 {
@@ -58,6 +59,36 @@ void WatchManager::add_directory(
         directory,
         std::move(watcher));
 }
+*/
+
+void WatchManager::add_directory(
+    const std::filesystem::path& directory)
+{
+    if (directory.empty())
+    {
+        throw std::invalid_argument(
+            "WatchManager directory must not be empty");
+    }
+
+    if (watchers_.contains(directory))
+    {
+        throw std::logic_error(
+            "Directory is already being watched");
+    }
+
+    add_watcher(directory);
+
+    const auto subdirectories =
+        discovery_.enumerate(directory);
+
+    for (const auto& subdirectory : subdirectories)
+    {
+        if (!watchers_.contains(subdirectory))
+        {
+            add_watcher(subdirectory);
+        }
+    }
+}
 
 void WatchManager::remove_directory(
     const std::filesystem::path& directory)
@@ -71,6 +102,34 @@ void WatchManager::remove_directory(
     }
 
     iterator->second->stop();
+}
+
+void WatchManager::add_watcher(
+    const std::filesystem::path& directory)
+{
+    const ULONG_PTR completion_key =
+        next_completion_key_++;
+
+    if (completion_key == 0)
+    {
+        throw std::overflow_error(
+            "WatchManager completion key exhausted");
+    }
+
+    DirectoryWatcherConfig config;
+    config.directory = directory;
+    config.completion_key = completion_key;
+
+    auto watcher = std::make_unique<DirectoryWatcher>(
+        iocp_,
+        event_queue_,
+        std::move(config));
+
+    watcher->start();
+
+    watchers_.emplace(
+        directory,
+        std::move(watcher));
 }
 
 bool WatchManager::handle_completion(
