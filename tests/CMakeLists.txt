@@ -28,6 +28,7 @@ add_executable(
 	unit/iocp_operation_tests.cpp
 	unit/bounded_queue_tests.cpp
 	unit/file_system_event_tests.cpp
+	unit/directory_discovery_tests.cpp
 	integration/iocp_read_file_tests.cpp
 	integration/directory_watcher_tests.cpp
 	integration/watch_manager_tests.cpp

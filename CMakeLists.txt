@@ -128,6 +128,7 @@ add_library(
         src/filesystem/filesystem.cpp
 		src/filesystem/directory_watcher.cpp
 		src/filesystem/watch_manager.cpp
+		src/filesystem/directory_discovery.cpp
 )
 
 target_link_libraries(
