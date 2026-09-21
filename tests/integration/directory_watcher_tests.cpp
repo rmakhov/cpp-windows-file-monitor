@@ -1089,3 +1089,138 @@ TEST_F(
 
     EXPECT_TRUE(stopped);
 }
+
+TEST_F(
+    DirectoryWatcherTest,
+    MarksReconciliationRequiredOnDeferredEventOverflow)
+{
+    cwm::iocp::IocpContext iocp;
+
+    cwm::concurrency::BoundedQueue<
+        cwm::filesystem::FileSystemEvent>
+        event_queue(1);
+
+    constexpr ULONG_PTR completion_key = 1240;
+
+    cwm::filesystem::DirectoryWatcherConfig config;
+    config.directory = test_directory_;
+    config.completion_key = completion_key;
+    config.deferred_event_capacity = 1;
+
+    cwm::filesystem::DirectoryWatcher watcher(
+        iocp,
+        event_queue,
+        config);
+
+    watcher.start();
+
+    EXPECT_EQ(
+        watcher.state(),
+        cwm::filesystem::DirectoryWatcherState::Running);
+
+    // Occupy the queue so the next filesystem event
+    // cannot be delivered.
+    cwm::filesystem::FileSystemEvent queued_event{
+        test_directory_ / "queued.txt",
+        cwm::filesystem::FileSystemEventAction::Added,
+        std::chrono::steady_clock::now()};
+
+    ASSERT_EQ(
+        event_queue.try_push(queued_event),
+        cwm::concurrency::QueuePushResult::Accepted);
+
+    // Generate a filesystem event.
+	const auto overflow_file_1 =
+		test_directory_ / "overflow_1.txt";
+
+	const auto overflow_file_2 =
+		test_directory_ / "overflow_2.txt";
+
+	{
+		std::ofstream file(overflow_file_1);
+		ASSERT_TRUE(file.is_open());
+		file << "overflow 1";
+	}
+
+	{
+		std::ofstream file(overflow_file_2);
+		ASSERT_TRUE(file.is_open());
+		file << "overflow 2";
+	}
+
+    const auto deadline =
+        std::chrono::steady_clock::now() +
+        std::chrono::seconds(2);
+
+    while (std::chrono::steady_clock::now() < deadline)
+    {
+        const auto remaining =
+            std::chrono::duration_cast<
+                std::chrono::milliseconds>(
+                deadline -
+                std::chrono::steady_clock::now());
+
+        const auto completion =
+            iocp.wait(remaining);
+
+        if (!completion.has_value())
+        {
+            break;
+        }
+
+        ASSERT_TRUE(
+            watcher.handle_completion(*completion));
+
+        if (watcher.state() ==
+            cwm::filesystem::
+                DirectoryWatcherState::
+                    ReconciliationRequired)
+        {
+            break;
+        }
+    }
+
+    EXPECT_EQ(
+        watcher.state(),
+        cwm::filesystem::
+            DirectoryWatcherState::
+                ReconciliationRequired);
+
+    EXPECT_EQ(
+        watcher.reconciliation_reason(),
+        cwm::filesystem::
+            ReconciliationReason::
+                DeferredEventOverflow);
+
+	watcher.stop();
+
+	const auto stop_deadline =
+		std::chrono::steady_clock::now() +
+		std::chrono::seconds(2);
+
+	while (watcher.state() !=
+		   cwm::filesystem::DirectoryWatcherState::Stopped &&
+		   std::chrono::steady_clock::now() < stop_deadline)
+	{
+		const auto remaining =
+			std::chrono::duration_cast<
+				std::chrono::milliseconds>(
+				stop_deadline -
+				std::chrono::steady_clock::now());
+
+		const auto completion =
+			iocp.wait(remaining);
+
+		if (!completion.has_value())
+		{
+			break;
+		}
+
+		ASSERT_TRUE(
+			watcher.handle_completion(*completion));
+	}
+
+	ASSERT_EQ(
+		watcher.state(),
+		cwm::filesystem::DirectoryWatcherState::Stopped);
+}
