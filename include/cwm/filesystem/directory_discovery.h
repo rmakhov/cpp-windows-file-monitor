@@ -22,6 +22,10 @@ public:
     [[nodiscard]]
     std::vector<std::filesystem::path> enumerate(
         const std::filesystem::path& directory) const;
+		
+	[[nodiscard]]
+	std::vector<std::filesystem::path> enumerate_recursive(
+		const std::filesystem::path& directory) const;
 };
 
 } // namespace cwm::filesystem

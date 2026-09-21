@@ -192,7 +192,7 @@ bool DirectoryWatcher::handle_completion(
 		state_ = DirectoryWatcherState::Stopped;
 		return true;
 	}
-
+/*
     if (completion.error != ERROR_SUCCESS)
     {
         handle_read_error(completion.error);
@@ -205,6 +205,19 @@ bool DirectoryWatcher::handle_completion(
 
         return true;
     }
+	*/
+	
+	if (completion.error != ERROR_SUCCESS)
+	{
+		handle_read_error(completion.error);
+
+		if (state_ == DirectoryWatcherState::Running)
+		{
+			arm_read();
+		}
+
+		return true;
+	}
 
     if (completion.bytes_transferred == 0)
     {
@@ -497,6 +510,14 @@ void DirectoryWatcher::handle_read_error(
             directory_handle_.reset();
             state_ = DirectoryWatcherState::Stopped;
         }
+
+        return;
+    }
+
+    if (error == ERROR_NOTIFY_ENUM_DIR)
+    {
+        mark_reconciliation_required(
+            ReconciliationReason::WindowsNotificationOverflow);
 
         return;
     }

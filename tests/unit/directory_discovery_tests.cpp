@@ -2,6 +2,7 @@
 
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <chrono>
 #include <filesystem>
 #include <fstream>
@@ -155,6 +156,85 @@ TEST_F(
     }
 
     EXPECT_TRUE(exception_thrown);
+}
+
+TEST_F(
+    DirectoryDiscoveryTest,
+    EnumerateRecursiveReturnsEmptyForEmptyDirectory)
+{
+    const auto result =
+        discovery_.enumerate_recursive(test_root_);
+
+    EXPECT_TRUE(result.empty());
+}
+
+TEST_F(
+    DirectoryDiscoveryTest,
+    EnumerateRecursiveFindsNestedDirectories)
+{
+    const auto level1 =
+        create_directory("level1");
+
+    const auto level2 =
+        std::filesystem::create_directories(
+            level1 / "level2");
+
+    ASSERT_TRUE(level2);
+
+    const auto level3 =
+        std::filesystem::create_directories(
+            level1 / "level2" / "level3");
+
+    ASSERT_TRUE(level3);
+
+    const auto result =
+        discovery_.enumerate_recursive(test_root_);
+
+    EXPECT_EQ(result.size(), 3u);
+
+    EXPECT_NE(
+        std::find(
+            result.begin(),
+            result.end(),
+            level1),
+        result.end());
+
+    EXPECT_NE(
+        std::find(
+            result.begin(),
+            result.end(),
+            level1 / "level2"),
+        result.end());
+
+    EXPECT_NE(
+        std::find(
+            result.begin(),
+            result.end(),
+            level1 / "level2" / "level3"),
+        result.end());
+}
+
+TEST_F(
+    DirectoryDiscoveryTest,
+    EnumerateRecursiveIgnoresFiles)
+{
+    const auto directory =
+        create_directory("directory");
+
+    create_file(
+        test_root_ / "file.txt");
+
+    create_file(
+        directory / "nested_file.txt");
+
+    const auto result =
+        discovery_.enumerate_recursive(test_root_);
+
+    ASSERT_EQ(result.size(), 1u);
+
+    EXPECT_EQ(
+        result.front(),
+        directory);
 }
 
 } // namespace
