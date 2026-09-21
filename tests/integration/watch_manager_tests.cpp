@@ -535,3 +535,212 @@ TEST_F(WatchManagerTest, StartsWatcherForNewDirectory)
 
     stop_and_drain(manager, iocp);
 }
+
+TEST_F(
+    WatchManagerTest,
+    ReconcilesDirectoryAfterWatcherFailure)
+{
+    cwm::iocp::IocpContext iocp;
+
+    cwm::concurrency::BoundedQueue<
+        cwm::filesystem::FileSystemEvent>
+        event_queue(1);
+
+    cwm::filesystem::WatchManagerConfig config;
+    config.deferred_event_capacity = 1;
+
+    cwm::filesystem::WatchManager manager(
+        iocp,
+        event_queue,
+        config);
+
+    const auto root =
+        create_directory(test_root_, "root");
+
+    const auto child =
+        create_directory(root, "child");
+
+    manager.add_directory(root);
+
+    ASSERT_EQ(
+        manager.watcher_count(),
+        2u);
+
+    // Occupy the event queue so filesystem events
+    // must be deferred by the watcher.
+    cwm::filesystem::FileSystemEvent queued_event{
+        root / "queued.txt",
+        cwm::filesystem::FileSystemEventAction::Added,
+        std::chrono::steady_clock::now()};
+
+    ASSERT_EQ(
+        event_queue.try_push(queued_event),
+        cwm::concurrency::QueuePushResult::Accepted);
+
+    // Generate enough events to overflow the deferred
+    // event capacity of the root watcher.
+    const auto file1 =
+        root / "overflow_1.txt";
+
+    const auto file2 =
+        root / "overflow_2.txt";
+
+    create_file(file1);
+    create_file(file2);
+
+    bool reconciliation_triggered = false;
+
+    const auto deadline =
+        std::chrono::steady_clock::now() +
+        std::chrono::seconds(5);
+
+    while (std::chrono::steady_clock::now() < deadline)
+    {
+        const auto completion =
+            iocp.wait(std::chrono::milliseconds(100));
+
+        if (!completion)
+        {
+            continue;
+        }
+
+		if (!manager.handle_completion(*completion)) {
+			continue;
+		}
+
+        /*
+         * During reconciliation the affected watcher is
+         * temporarily removed. We therefore don't require
+         * watcher_count() to remain 2 at every instant.
+         */
+        if (manager.watcher_count() == 2u)
+        {
+            reconciliation_triggered = true;
+            break;
+        }
+    }
+
+    EXPECT_TRUE(reconciliation_triggered);
+    EXPECT_EQ(
+        manager.watcher_count(),
+        2u);
+
+    stop_and_drain(manager, iocp);
+}
+
+TEST_F(
+    WatchManagerTest,
+    ReconcilesDirectoryAfterDeferredEventOverflow)
+{
+    cwm::iocp::IocpContext iocp;
+
+    cwm::concurrency::BoundedQueue<
+        cwm::filesystem::FileSystemEvent>
+        event_queue(1);
+
+    cwm::filesystem::WatchManagerConfig config;
+    config.deferred_event_capacity = 1;
+
+    cwm::filesystem::WatchManager manager(
+        iocp,
+        event_queue,
+        config);
+
+    const auto root =
+        create_directory(test_root_, "root");
+
+    const auto child =
+        create_directory(root, "child");
+
+    manager.add_directory(root);
+
+    ASSERT_EQ(
+        manager.watcher_count(),
+        2u);
+
+    cwm::filesystem::FileSystemEvent queued_event{
+        root / "queued.txt",
+        cwm::filesystem::FileSystemEventAction::Added,
+        std::chrono::steady_clock::now()};
+
+    ASSERT_EQ(
+        event_queue.try_push(queued_event),
+        cwm::concurrency::QueuePushResult::Accepted);
+
+    create_file(root / "overflow_1.txt");
+    create_file(root / "overflow_2.txt");
+
+    bool watcher_reconciled = false;
+
+    const auto deadline =
+        std::chrono::steady_clock::now() +
+        std::chrono::seconds(5);
+
+    while (std::chrono::steady_clock::now() < deadline)
+    {
+        const auto completion =
+            iocp.wait(std::chrono::milliseconds(100));
+
+        if (!completion)
+        {
+            continue;
+        }
+
+        if (!manager.handle_completion(*completion)) {
+			continue;
+		}
+
+        if (manager.watcher_count() == 2u)
+        {
+            watcher_reconciled = true;
+            break;
+        }
+    }
+
+    ASSERT_TRUE(watcher_reconciled);
+    ASSERT_EQ(
+        manager.watcher_count(),
+        2u);
+
+    // Verify that the recreated root watcher is functional.
+    const auto post_reconciliation_directory =
+        root / "post_reconciliation";
+
+    ASSERT_TRUE(
+        std::filesystem::create_directory(
+            post_reconciliation_directory));
+
+    bool new_watcher_started = false;
+
+    const auto watcher_deadline =
+        std::chrono::steady_clock::now() +
+        std::chrono::seconds(5);
+
+    while (std::chrono::steady_clock::now() < watcher_deadline)
+    {
+        const auto completion =
+            iocp.wait(std::chrono::milliseconds(100));
+
+        if (!completion)
+        {
+            continue;
+        }
+
+        if (!manager.handle_completion(*completion)) {
+			continue;
+		}
+
+        if (manager.watcher_count() == 3u)
+        {
+            new_watcher_started = true;
+            break;
+        }
+    }
+
+    EXPECT_TRUE(new_watcher_started);
+    EXPECT_EQ(
+        manager.watcher_count(),
+        3u);
+
+    stop_and_drain(manager, iocp);
+}

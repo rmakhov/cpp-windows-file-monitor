@@ -11,16 +11,24 @@
 #include <filesystem>
 #include <memory>
 #include <unordered_map>
+#include <unordered_set>
 
 namespace cwm::filesystem
 {
+	
+struct WatchManagerConfig
+{
+    std::size_t notification_buffer_size = 64 * 1024;
+    std::size_t deferred_event_capacity = 512;
+};
 
 class WatchManager final
 {
 public:
     WatchManager(
         iocp::IocpContext& iocp,
-        concurrency::BoundedQueue<FileSystemEvent>& event_queue);
+        concurrency::BoundedQueue<FileSystemEvent>& event_queue,
+		 WatchManagerConfig config = {});
 
     ~WatchManager();
 
@@ -57,14 +65,26 @@ private:
             std::filesystem::path,
             WatcherPtr>;
 
-private:
     iocp::IocpContext& iocp_;
     concurrency::BoundedQueue<FileSystemEvent>& event_queue_;
+	
+	WatchManagerConfig config_;
 
     WatcherMap watchers_;
-	DirectoryDiscovery discovery_;
+    DirectoryDiscovery discovery_;
 
     ULONG_PTR next_completion_key_{1};
+
+    std::unordered_set<std::filesystem::path>
+        pending_reconciliation_;
+
+    void reconcile_directory(
+        const std::filesystem::path& directory);
+
+    [[nodiscard]]
+    bool is_within_directory(
+        const std::filesystem::path& path,
+        const std::filesystem::path& root) const;
 };
 
 } // namespace cwm::filesystem
